@@ -1,0 +1,31 @@
+name: Riot Games ETL Pipeline
+
+on:
+  schedule:
+    # Se ejecuta todos los días a las 08:00 UTC (05:00 AM Santiago, Chile)
+    - cron: '0 8 * * *'
+  # Gatilla el pipeline manualmente desde la página de GitHub
+  workflow_dispatch: 
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ejecutar orquestador ETL
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+        run: python main.py
