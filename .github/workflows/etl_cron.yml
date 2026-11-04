@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ejecutar orquestador ETL
+      - name: Ejecutar ETL
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
           DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
