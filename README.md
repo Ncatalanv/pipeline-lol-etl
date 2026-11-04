@@ -39,4 +39,21 @@ Para replicar este proyecto en un entorno local:
 
 1. Clona este repositorio:
    ```bash
-   git clone [https://github.com/tu-usuario/lol-etl-pipeline.git](https://github.com/tu-usuario/lol-etl-pipeline.git)
+   git clone https://github.com/Ncatalanv/pipeline-lol-etl.git
+   ```
+
+2. Instala las dependencias requeridas:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Crea un archivo `.env` en la raíz del proyecto y configura tus credenciales:
+   ```env
+   RIOT_API_KEY=tu_api_key_de_riot
+   DB_CONNECTION_STRING=mysql+pymysql://usuario:password@host:4000/lol_analytics?ssl_verify_cert=true&ssl_verify_identity=true
+   ```
+
+4. Ejecuta el orquestador:
+   ```bash
+   python main.py
+   ```
