@@ -32,62 +32,71 @@ if not busqueda:
     st.info("Escribe el nombre de un jugador y su tag para ver sus estadísticas o descargarlas.")
     st.stop()
 
-# Validar formato Riot ID
+# Validar formato
 if "#" not in busqueda:
     st.error("Formato incorrecto. Debes incluir el '#' y el Tag (Ejemplo: miNombre#LAS)")
     st.stop()
 
-# LIMPIEZA DE LA BÚSQUEDA
+# Limpieza de búsqueda
 game_name, tag_line = busqueda.split("#")
 game_name = game_name.strip()
 tag_line = tag_line.strip()
-
-# Formamción de ID exacto y limpio, ej: "duvan007#las"
 riot_id_limpio = f"{game_name}#{tag_line}".lower()
 
-# Armar el string de conexión a TiDB
+# Conexión DB
 secrets = st.secrets["tidb"]
 db_url = f"mysql+pymysql://{secrets['username']}:{secrets['password']}@{secrets['host']}:{secrets['port']}/{secrets['database']}"
 
-# FILTRAR USANDO EL ID LIMPIO
+# Filtrar datos existentes
 df_filtrado = df[df['summoner_name'].str.lower() == riot_id_limpio]
 
-# Si el jugador no existe localmente, activar el Pipeline
+# --- FUNCIÓN ETL REUTILIZABLE (Carga Incremental) ---
+def ejecutar_pipeline_etl():
+    with st.spinner(f"Buscando nuevas partidas de {game_name}#{tag_line}..."):
+        try:
+            os.environ["RIOT_API_KEY"] = st.secrets["riot"]["api_key"]
+            os.environ["DB_CONNECTION_STRING"] = db_url
+            
+            extractor = RiotDataExtractor()
+            puuid = extractor.get_puuid(game_name, tag_line)
+            match_ids = extractor.get_match_ids(puuid, count=10)
+            
+            # Evitar partidas duplicadas comparando con la base local
+            partidas_existentes = df_filtrado['match_id'].tolist() if not df_filtrado.empty else []
+            match_ids_nuevos = [m_id for m_id in match_ids if m_id not in partidas_existentes]
+            
+            if not match_ids_nuevos:
+                # Detener pipeline si el jugador está al día
+                st.success("Tu historial ya está al día. No jugaste partidas nuevas.")
+                return 
+                
+            datos_crudos = []
+            for m_id in match_ids_nuevos:
+                detalle = extractor.get_match_detail(m_id)
+                if detalle:
+                    datos_crudos.append(detalle)
+                    
+            df_limpio = transform_match_data(datos_crudos)
+            load_to_database(df_limpio, table_name="fact_player,match_stats")
+            
+            st.cache_data.clear()
+            st.success(f"¡Se agregaron {len(match_ids_nuevos)} partidas nuevas! Recargando...")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"Error en el ETL: {e}")
+
+# --- LÓGICA DE INTERFAZ ---
 if df_filtrado.empty:
     st.warning(f"El invocador '{game_name}#{tag_line}' no está en la base de datos local.")
-    
-    if st.button("⚡ Extraer datos desde Riot Games"):
-        with st.spinner(f"Ejecutando pipeline ETL para {game_name}#{tag_line}..."):
-            try:
-                # --- PREPARACIÓN DE ENTORNO PARA LA NUBE ---
-                os.environ["RIOT_API_KEY"] = st.secrets["riot"]["api_key"]
-                os.environ["DB_CONNECTION_STRING"] = db_url
-                
-                # --- EXTRACT ---
-                extractor = RiotDataExtractor()
-                puuid = extractor.get_puuid(game_name, tag_line)
-                match_ids = extractor.get_match_ids(puuid, count=10)
-                
-                datos_crudos = []
-                for m_id in match_ids:
-                    detalle = extractor.get_match_detail(m_id)
-                    if detalle:
-                        datos_crudos.append(detalle)
-                
-                # --- TRANSFORM ---
-                df_limpio = transform_match_data(datos_crudos)
-                
-                # --- LOAD ---
-                load_to_database(df_limpio, table_name="fact_player,match_stats")
-                
-                # --- FIN DEL PIPELINE ---
-                st.cache_data.clear()
-                st.success("¡Pipeline completado! Datos insertados en TiDB. Recargando...")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Error en la ejecución del ETL: {e}")
-    st.stop()
+    if st.button("Extraer datos desde Riot Games"):
+        ejecutar_pipeline_etl()
+    st.stop() # Detenemos la app porque aún no hay datos para mostrar gráficos
+else:
+    col_vacia, col_boton = st.columns([4, 1])
+    with col_boton:
+        if st.button("Actualizar Historial"):
+            ejecutar_pipeline_etl()
 
 # 4. MÉTRICAS GLOBALES
 victorias = df_filtrado['win'].sum()
