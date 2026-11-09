@@ -20,7 +20,7 @@ def load_data():
 df = load_data()
 
 # 3. BÚSQUEDA DE JUGADOR
-busqueda = st.text_input("Busca un Invocador por nombre:", placeholder="Ejemplo: Faker")
+busqueda = st.text_input("Busca un Invocador por nombre:", placeholder="Ejemplo: Faker#LAS")
 
 #Si la barra está vacía, mostrar un mensaje y detener la ejecución
 if not busqueda:
