@@ -3,6 +3,11 @@ import pandas as pd
 from sqlalchemy import create_engine
 import plotly.graph_objects as go
 
+#Importación ETL
+from extract import RiotDataExtractor
+from transform import transform_match_data
+from load import load_to_database
+
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Analíticas League of Legends LAS", layout="wide", initial_sidebar_state="collapsed")
 st.title("League of Legends Rendimiento de Invocadores - LAS")
@@ -19,20 +24,70 @@ def load_data():
 
 df = load_data()
 
-# 3. BÚSQUEDA DE JUGADOR
-busqueda = st.text_input("Busca un Invocador por nombre:", placeholder="Ejemplo: Faker#LAS")
+# 3. BÚSQUEDA DE JUGADOR Y ETL
+busqueda = st.text_input("🔍 Busca un Invocador (Obligatorio incluir Tag, Ej: Faker#KR1)")
 
-#Si la barra está vacía, mostrar un mensaje y detener la ejecución
 if not busqueda:
-    st.info("Escribe el nombre de un jugador en la barra de búsqueda para ver sus estadísticas.")
+    st.info("👆 Escribe el nombre de un jugador y su tag para ver sus estadísticas o descargarlas.")
     st.stop()
 
-#Filtración del DataFrame ignorando mayúsculas, minúsculas y espacios
+# Validar formato Riot ID
+if "#" not in busqueda:
+    st.error("⚠️ Formato incorrecto. Debes incluir el '#' y el Tag (Ejemplo: miNombre#LAS)")
+    st.stop()
+
+# Armar el string de conexión a TiDB desde los secrets de Streamlit
+secrets = st.secrets["tidb"]
+db_url = f"mysql+pymysql://{secrets['username']}:{secrets['password']}@{secrets['host']}:{secrets['port']}/{secrets['database']}"
+
+# Filtrar base local
+# Filtrar por "Nombre#TAG" ignorando mayúsculas y espacios
 df_filtrado = df[df['summoner_name'].str.lower() == busqueda.strip().lower()]
 
-#En caso que el jugador no exista
+# Si el jugador no existe localmente, activar el Pipeline
 if df_filtrado.empty:
-    st.warning(f"No se encontraron datos para el jugador '{busqueda}'. Por favor, verifica el nombre e inténtalo de nuevo.")
+    st.warning(f"El invocador '{busqueda}' no está en la base de datos local.")
+    
+    if st.button("Extraer datos desde Riot Games"):
+        with st.spinner(f"Ejecutando pipeline ETL para {busqueda}..."):
+            try:
+                # --- PREPARACIÓN DE ENTORNO PARA LA NUBE ---
+                # Inyectamos los secrets en el sistema operativo para que tus scripts crean que leen un .env
+                os.environ["RIOT_API_KEY"] = st.secrets["riot"]["api_key"]
+                os.environ["DB_CONNECTION_STRING"] = db_url
+                
+                # Separar nombre y tag para la API
+                game_name, tag_line = busqueda.split("#")
+                game_name = game_name.strip()
+                tag_line = tag_line.strip()
+                
+                # --- EXTRACCIÓN ---
+                extractor = RiotDataExtractor()
+                puuid = extractor.get_puuid(game_name, tag_line)
+                match_ids = extractor.get_match_ids(puuid, count=10) # Trae las últimas 10 partidas
+                
+                datos_crudos = []
+                for m_id in match_ids:
+                    detalle = extractor.get_match_detail(m_id)
+                    if detalle:
+                        datos_crudos.append(detalle)
+                
+                # --- TRANSFORMACIÓN ---
+                # Pasamos la lista de JSONs y nos devuelve el DataFrame de Pandas limpio
+                df_limpio = transform_match_data(datos_crudos)
+                
+                # --- CARGA ---
+                # Usa el string de conexión que inyectamos arriba y sube a TiDB
+                # Nota: usamos el nombre exacto de la tabla con los acentos graves (backticks) por si SQL lo requiere
+                load_to_database(df_limpio, table_name="`fact_player,match_stats`")
+                
+                # --- FIN DEL PIPELINE ---
+                st.cache_data.clear()
+                st.success("¡Pipeline completado! Datos insertados en TiDB. Recargando...")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error en la ejecución del ETL: {e}")
     st.stop()
 
 # 4. MÉTRICAS GLOBALES
