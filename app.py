@@ -25,15 +25,15 @@ def load_data():
 df = load_data()
 
 # 3. BÚSQUEDA DE JUGADOR Y ETL
-busqueda = st.text_input("🔍 Busca un Invocador (Obligatorio incluir Tag, Ej: Faker#KR1)")
+busqueda = st.text_input("Busca un Invocador (Obligatorio incluir Tag, Ej: Faker#KR1)")
 
 if not busqueda:
-    st.info("👆 Escribe el nombre de un jugador y su tag para ver sus estadísticas o descargarlas.")
+    st.info("Escribe el nombre de un jugador y su tag para ver sus estadísticas o descargarlas.")
     st.stop()
 
 # Validar formato Riot ID
 if "#" not in busqueda:
-    st.error("⚠️ Formato incorrecto. Debes incluir el '#' y el Tag (Ejemplo: miNombre#LAS)")
+    st.error("Formato incorrecto. Debes incluir el '#' y el Tag (Ejemplo: miNombre#LAS)")
     st.stop()
 
 # Armar el string de conexión a TiDB desde los secrets de Streamlit
