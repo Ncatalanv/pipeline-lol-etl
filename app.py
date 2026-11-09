@@ -4,9 +4,9 @@ from sqlalchemy import create_engine
 import plotly.graph_objects as go
 
 #Importación ETL
-from extract import RiotDataExtractor
-from transform import transform_match_data
-from load import load_to_database
+from src.extract import RiotDataExtractor
+from src.transform import transform_match_data
+from src.load import load_to_database
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Analíticas League of Legends LAS", layout="wide", initial_sidebar_state="collapsed")
