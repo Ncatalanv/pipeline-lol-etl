@@ -19,10 +19,21 @@ def load_data():
 
 df = load_data()
 
-# 3. FILTROS GLOBALES
-jugadores = df['summoner_name'].unique()
-jugador_seleccionado = st.selectbox("Busca un Invocador", jugadores)
-df_filtrado = df[df['summoner_name'] == jugador_seleccionado]
+# 3. BÚSQUEDA DE JUGADOR
+busqueda = st.text_input("Busca un Invocador por nombre:", placeholder="Ejemplo: Faker")
+
+#Si la barra está vacía, mostrar un mensaje y detener la ejecución
+if not busqueda:
+    st.info("Escribe el nombre de un jugador en la barra de búsqueda para ver sus estadísticas.")
+    st.stop()
+
+#Filtración del DataFrame ignorando mayúsculas, minúsculas y espacios
+df_filtrado = df[df['summoner_name'].str.lower() == busqueda.strip().lower()]
+
+#En caso que el jugador no exista
+if df_filtrado.empty:
+    st.warning(f"No se encontraron datos para el jugador '{busqueda}'. Por favor, verifica el nombre e inténtalo de nuevo.")
+    st.stop()
 
 # 4. MÉTRICAS GLOBALES
 victorias = df_filtrado['win'].sum()
@@ -64,7 +75,7 @@ with col_grafico:
 
 st.markdown("---")
 
-# 6. CUADRÍCULA INFERIOR (Estilo OP.GG: 1/3 Izquierda, 2/3 Derecha)
+# 6. CUADRÍCULA INFERIOR
 col_izq, col_der = st.columns([1, 2])
 
 # --- COLUMNA IZQUIERDA: Estilo de Juego ---
