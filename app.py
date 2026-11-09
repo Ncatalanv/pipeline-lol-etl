@@ -37,35 +37,36 @@ if "#" not in busqueda:
     st.error("Formato incorrecto. Debes incluir el '#' y el Tag (Ejemplo: miNombre#LAS)")
     st.stop()
 
-# Armar el string de conexión a TiDB desde los secrets de Streamlit
+# LIMPIEZA DE LA BÚSQUEDA
+game_name, tag_line = busqueda.split("#")
+game_name = game_name.strip()
+tag_line = tag_line.strip()
+
+# Formamción de ID exacto y limpio, ej: "duvan007#las"
+riot_id_limpio = f"{game_name}#{tag_line}".lower()
+
+# Armar el string de conexión a TiDB
 secrets = st.secrets["tidb"]
 db_url = f"mysql+pymysql://{secrets['username']}:{secrets['password']}@{secrets['host']}:{secrets['port']}/{secrets['database']}"
 
-# Filtrar base local
-# Filtrar por "Nombre#TAG" ignorando mayúsculas y espacios
-df_filtrado = df[df['summoner_name'].str.lower() == busqueda.strip().lower()]
+# FILTRAR USANDO EL ID LIMPIO
+df_filtrado = df[df['summoner_name'].str.lower() == riot_id_limpio]
 
 # Si el jugador no existe localmente, activar el Pipeline
 if df_filtrado.empty:
-    st.warning(f"El invocador '{busqueda}' no está en la base de datos local.")
+    st.warning(f"El invocador '{game_name}#{tag_line}' no está en la base de datos local.")
     
-    if st.button("Extraer datos desde Riot Games"):
-        with st.spinner(f"Ejecutando pipeline ETL para {busqueda}..."):
+    if st.button("⚡ Extraer datos desde Riot Games"):
+        with st.spinner(f"Ejecutando pipeline ETL para {game_name}#{tag_line}..."):
             try:
                 # --- PREPARACIÓN DE ENTORNO PARA LA NUBE ---
-                # Inyectamos los secrets en el sistema operativo para que tus scripts crean que leen un .env
                 os.environ["RIOT_API_KEY"] = st.secrets["riot"]["api_key"]
                 os.environ["DB_CONNECTION_STRING"] = db_url
                 
-                # Separar nombre y tag para la API
-                game_name, tag_line = busqueda.split("#")
-                game_name = game_name.strip()
-                tag_line = tag_line.strip()
-                
-                # --- EXTRACCIÓN ---
+                # --- EXTRACT ---
                 extractor = RiotDataExtractor()
                 puuid = extractor.get_puuid(game_name, tag_line)
-                match_ids = extractor.get_match_ids(puuid, count=10) # Trae las últimas 10 partidas
+                match_ids = extractor.get_match_ids(puuid, count=10)
                 
                 datos_crudos = []
                 for m_id in match_ids:
@@ -73,14 +74,11 @@ if df_filtrado.empty:
                     if detalle:
                         datos_crudos.append(detalle)
                 
-                # --- TRANSFORMACIÓN ---
-                # Pasamos la lista de JSONs y nos devuelve el DataFrame de Pandas limpio
+                # --- TRANSFORM ---
                 df_limpio = transform_match_data(datos_crudos)
                 
-                # --- CARGA ---
-                # Usa el string de conexión que inyectamos arriba y sube a TiDB
-                # Nota: usamos el nombre exacto de la tabla con los acentos graves (backticks) por si SQL lo requiere
-                load_to_database(df_limpio, table_name="`fact_player,match_stats`")
+                # --- LOAD ---
+                load_to_database(df_limpio, table_name="fact_player,match_stats")
                 
                 # --- FIN DEL PIPELINE ---
                 st.cache_data.clear()
