@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
 import plotly.graph_objects as go
+import os
 
 #Importación ETL
 from src.extract import RiotDataExtractor
