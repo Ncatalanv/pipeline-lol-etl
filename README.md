@@ -1,5 +1,11 @@
 # League of Legends Incremental ETL & Data App
 
+*(Read this in [Spanish](README.es.md))*
+
+![ETL Pipeline Demo](assets/demo.gif)
+
+**[Live App: Test the On-Demand ETL here](https://pipeline-lol-etl-w7ypxneyrydcbqyxu9glmu.streamlit.app/?embed=true)**
+
 An End-to-End Data Engineering project that extracts live match statistics from the official Riot Games API, transforms nested JSON data, loads it into a cloud-based TiDB (MySQL) Data Warehouse, and serves it through an interactive UI inspired by OP.GG.
 
 This project demonstrates a complete data engineering lifecycle, focusing on modular architecture, API rate-limit handling, relational data modeling, and **Incremental Loading** strategies.
@@ -11,6 +17,7 @@ This project demonstrates a complete data engineering lifecycle, focusing on mod
 * **Modular Architecture:** The codebase is strictly decoupled into `extract`, `transform`, and `load` modules within the `src/` directory, adhering to software engineering best practices for scalability.
 * **Data Modeling:** Flat, analytics-ready Fact Table (`fact_player_match_stats`) designed to support rapid querying and metric calculation (Win Rate, KDA) without complex joins.
 * **Secure Secrets Management:** API keys and database credentials are fully decoupled from the codebase using Streamlit Secrets and dynamic OS environment variable injection.
+* **Regional Scope (LAS):** The data pipeline and analytics are currently optimized and scoped for the Latin America South (LAS) server, demonstrating focused product constraints and efficient MVP delivery.
 
 ## Technology Stack
 

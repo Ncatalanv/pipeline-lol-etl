@@ -26,10 +26,10 @@ def load_data():
 df = load_data()
 
 # 3. BÚSQUEDA DE JUGADOR Y ETL
-busqueda = st.text_input("Busca un Invocador (Obligatorio incluir Tag, Ej: Faker#KR1)")
+busqueda = st.text_input("Busca un Invocador de LAS (Obligatorio incluir Tag, Ej: Faker#LAS)")
 
 if not busqueda:
-    st.info("Escribe el nombre de un jugador y su tag para ver sus estadísticas o descargarlas.")
+    st.info("Escribe el nombre de un jugador y su tag del servidor LAS (Latinoámerica Sur) para ver sus estadísticas.")
     st.stop()
 
 # Validar formato
