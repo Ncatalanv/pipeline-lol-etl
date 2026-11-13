@@ -1,59 +1,70 @@
-# League of Legends ETL Pipeline | Cloud Data Engineering
+# League of Legends Incremental ETL & Data App
 
-Un pipeline ETL (Extract, Transform, Load) automatizado que extrae estadísticas de partidas de la API oficial de Riot Games, procesa los datos en Python y los carga en un almacén de datos transaccional en la nube.
+An End-to-End Data Engineering project that extracts live match statistics from the official Riot Games API, transforms nested JSON data, loads it into a cloud-based TiDB (MySQL) Data Warehouse, and serves it through an interactive UI inspired by OP.GG.
 
-Este proyecto demuestra el ciclo de vida completo de la ingeniería de datos, incluyendo orquestación en la nube, manejo de límites de peticiones (Rate Limiting) y modelado de datos relacionales.
+This project demonstrates a complete data engineering lifecycle, focusing on modular architecture, API rate-limit handling, relational data modeling, and **Incremental Loading** strategies.
 
-## Arquitectura del Flujo de Datos
+## Key Data Engineering Features
 
-1. **Extract (Riot Games API):** Extracción de perfiles de invocador (Account-V1) y detalles de partidas (Match-V5) utilizando peticiones HTTP. Implementa control de errores (status 429) y *rate limiting* adaptativo.
-2. **Transform (Pandas):** Limpieza de estructuras JSON anidadas, deduplicación de registros, cálculo de métricas derivadas (KDA) y normalización de identificadores unificados (Riot IDs).
-3. **Load (TiDB Serverless / MySQL):** Ingesta de datos limpios hacia una base de datos relacional en la nube utilizando SQLAlchemy y PyMySQL.
-4. **Orchestration (GitHub Actions):** Automatización CI/CD que ejecuta el script principal de manera programada (CRON), manteniendo la base de datos actualizada diariamente sin intervención manual.
+* **On-Demand ETL Pipeline:** Instead of traditional scheduled batch jobs, the pipeline is triggered dynamically via the Streamlit UI. If a queried player is not in the database, the app extracts their recent matches on the fly.
+* **Incremental Loading Strategy:** To prevent data duplication and optimize API call limits, the pipeline cross-references incoming `match_id`s with existing database records, transforming and inserting only new matches.
+* **Modular Architecture:** The codebase is strictly decoupled into `extract`, `transform`, and `load` modules within the `src/` directory, adhering to software engineering best practices for scalability.
+* **Data Modeling:** Flat, analytics-ready Fact Table (`fact_player_match_stats`) designed to support rapid querying and metric calculation (Win Rate, KDA) without complex joins.
+* **Secure Secrets Management:** API keys and database credentials are fully decoupled from the codebase using Streamlit Secrets and dynamic OS environment variable injection.
 
-## Stack Tecnológico
+## Technology Stack
 
-* **Lenguaje:** Python 3.11+
-* **Librerías:** Pandas, SQLAlchemy, PyMySQL, Requests
-* **Base de Datos:** TiDB Serverless (MySQL-compatible Cloud DB)
-* **Orquestación e Infraestructura:** GitHub Actions
+* **Language:** Python 3.11+
+* **Data Processing:** Pandas
+* **Database & ORM:** TiDB Serverless (MySQL-compatible Cloud DB), SQLAlchemy, PyMySQL
+* **Data Serving & UI:** Streamlit, Plotly, HTML/CSS
+* **Source API:** Riot Games Developer API (Account-V1, Match-V5)
 
-## Modelo de Datos
+## Relational Data Model
 
-Los datos se estructuran en una tabla de hechos diseñada para análisis analítico (`fact_player_match_stats`):
+The data is structured into a transactional Fact Table optimized for downstream analytics (`fact_player_match_stats`):
 
-| Columna | Tipo de Dato | Descripción |
+| Column | Data Type | Description |
 | :--- | :--- | :--- |
-| `match_id` | VARCHAR | Identificador único de la partida (ej. LA2_123456789) |
-| `puuid` | VARCHAR | Identificador global único del jugador |
-| `summoner_name` | VARCHAR | Riot ID y Tagline (ej. Jugador#LAS) |
-| `champion_name` | VARCHAR | Campeón utilizado |
-| `kills` / `deaths` / `assists` | INT | Estadísticas de combate base |
-| `kda` | FLOAT | Ratio de Asesinatos, Muertes y Asistencias |
-| `total_damage` | INT | Daño total infligido a campeones |
-| `win` | BOOLEAN | Resultado de la partida (1 = Victoria, 0 = Derrota) |
+| `match_id` | VARCHAR | Unique match identifier (e.g., LA2_123456789) |
+| `puuid` | VARCHAR | Global unique player identifier |
+| `summoner_name` | VARCHAR | Normalized Riot ID and Tagline (e.g., Player#LAS) |
+| `champion_name` | VARCHAR | Champion played |
+| `kills` / `deaths` / `assists` | INT | Core combat statistics |
+| `kda` | FLOAT | Derived metric: (Kills + Assists) / max(1, Deaths) |
+| `total_damage` | INT | Total damage dealt to champions |
+| `win` | BOOLEAN | Match outcome (1 = Victory, 0 = Defeat) |
 
-## Despliegue Local
+## Local Setup & Deployment
 
-Para replicar este proyecto en un entorno local:
+To replicate this Data Engineering environment locally:
 
-1. Clona este repositorio:
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/Ncatalanv/pipeline-lol-etl.git
+   cd pipeline-lol-etl
    ```
 
-2. Instala las dependencias requeridas:
+2. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Crea un archivo `.env` en la raíz del proyecto y configura tus credenciales:
-   ```env
-   RIOT_API_KEY=tu_api_key_de_riot
-   DB_CONNECTION_STRING=mysql+pymysql://usuario:password@host:4000/lol_analytics?ssl_verify_cert=true&ssl_verify_identity=true
+3. **Configure Environment Secrets:**
+   Create a `.streamlit` folder in the root directory and add a `secrets.toml` file with your credentials:
+   ```toml
+   [tidb]
+   host = "your-tidb-host.cloud"
+   port = 4000
+   database = "lol_analytics"
+   username = "your-username"
+   password = "your-password"
+
+   [riot]
+   api_key = "RGAPI-your-developer-api-key"
    ```
 
-4. Ejecuta el orquestador:
+4. **Launch the Data App:**
    ```bash
-   python main.py
+   streamlit run app.py
    ```
